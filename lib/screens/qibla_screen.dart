@@ -56,7 +56,7 @@ class QiblaScreen extends StatefulWidget {
 }
 
 class _QiblaScreenState extends State<QiblaScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   double? _latitude;
   double? _longitude;
   String _cityName = 'Locating...';
@@ -78,9 +78,19 @@ class _QiblaScreenState extends State<QiblaScreen>
 
   bool _manualLocationMounted = false;
 
+  // Aligned glow animation
+  late final AnimationController _glowCtrl;
+  late final Animation<double> _glowAnim;
+  bool _prevIsAligned = false;
+
   @override
   void initState() {
     super.initState();
+    _glowCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _glowAnim = _glowCtrl;
     _startSensors();
     _fetchLocation();
     _headingTextTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
@@ -88,12 +98,27 @@ class _QiblaScreenState extends State<QiblaScreen>
       if (rounded != _displayedHeadingDegrees && mounted) {
         setState(() => _displayedHeadingDegrees = rounded);
       }
+      // Update glow when alignment state changes
+      if (_latitude != null && _longitude != null) {
+        final qibla = _getQiblaBearing(_latitude!, _longitude!);
+        final diff = ((qibla - _lerpAngleDegrees + 540) % 360) - 180;
+        final nowAligned = diff.abs() <= _alignmentThresholdDegrees;
+        if (nowAligned != _prevIsAligned) {
+          _prevIsAligned = nowAligned;
+          if (nowAligned) {
+            _glowCtrl.forward();
+          } else {
+            _glowCtrl.reverse();
+          }
+        }
+      }
     });
     _animationTicker = createTicker(_onAnimationTick)..start();
   }
 
   @override
   void dispose() {
+    _glowCtrl.dispose();
     _compassSubscription?.cancel();
     _gyroscopeSubscription?.cancel();
     _headingTextTimer?.cancel();
@@ -245,8 +270,32 @@ class _QiblaScreenState extends State<QiblaScreen>
 
     return Scaffold(
       backgroundColor: appTheme.bg1,
-      body: SafeArea(
-        child: Column(
+      body: Stack(
+        children: [
+          // Aligned glow: gradient fade from top (65% height)
+          IgnorePointer(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: FadeTransition(
+                opacity: _glowAnim,
+                child: FractionallySizedBox(
+                  heightFactor: 0.65,
+                  widthFactor: 1.0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [appTheme.accentGlow, Colors.transparent],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
           children: [
             // Header
             Padding(
@@ -332,8 +381,7 @@ class _QiblaScreenState extends State<QiblaScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.crop_square_rounded,
+                        _CubeIcon(
                           size: 15,
                           color: isAligned ? appTheme.accent : appTheme.textDim,
                         ),
@@ -368,6 +416,8 @@ class _QiblaScreenState extends State<QiblaScreen>
             ),
           ],
         ),
+      ),
+        ],
       ),
     );
   }
@@ -441,14 +491,28 @@ class _CompassDial extends StatelessWidget {
             ),
           ),
 
-          // Fixed diamond needle
+          // Fixed diamond needle — cross-fade accent ↔ accentSoft on align
           Positioned(
             top: outerRadius * 0.20,
-            child: CustomPaint(
-              size: Size(20, outerRadius * 0.67),
-              painter: _DiamondNeedlePainter(
-                color: isAligned ? appTheme.accentSoft : appTheme.accent,
-              ),
+            child: Stack(
+              children: [
+                AnimatedOpacity(
+                  opacity: isAligned ? 0.0 : 1.0,
+                  duration: const Duration(milliseconds: 700),
+                  child: CustomPaint(
+                    size: Size(20, outerRadius * 0.67),
+                    painter: _DiamondNeedlePainter(color: appTheme.accent),
+                  ),
+                ),
+                AnimatedOpacity(
+                  opacity: isAligned ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 700),
+                  child: CustomPaint(
+                    size: Size(20, outerRadius * 0.67),
+                    painter: _DiamondNeedlePainter(color: appTheme.accentSoft),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -634,20 +698,35 @@ class _DialPainter extends CustomPainter {
         ..strokeWidth = 1;
       canvas.drawCircle(kaabaCenter, kaabaRadius, circleBorderPaint);
 
-      // Small square symbol for Kaaba
-      final squarePaint = Paint()
+      // Cube-outline symbol for Kaaba (isometric hex + 3 inner edges)
+      final s = kaabaRadius * 0.52;
+      final h = s * 0.88;
+      final tM = Offset(kaabaCenter.dx, kaabaCenter.dy - h);
+      final tL = Offset(kaabaCenter.dx - s, kaabaCenter.dy - h * 0.28);
+      final tR = Offset(kaabaCenter.dx + s, kaabaCenter.dy - h * 0.28);
+      final bL = Offset(kaabaCenter.dx - s, kaabaCenter.dy + h * 0.28);
+      final bR = Offset(kaabaCenter.dx + s, kaabaCenter.dy + h * 0.28);
+      final bM = Offset(kaabaCenter.dx, kaabaCenter.dy + h);
+      final cubePaint = Paint()
         ..color = appTheme.accent
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2;
-      final squareSize = kaabaRadius * 0.7;
-      canvas.drawRect(
-        Rect.fromCenter(
-          center: kaabaCenter,
-          width: squareSize,
-          height: squareSize,
-        ),
-        squarePaint,
+        ..strokeWidth = 1.0
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      canvas.drawPath(
+        Path()
+          ..moveTo(tM.dx, tM.dy)
+          ..lineTo(tR.dx, tR.dy)
+          ..lineTo(bR.dx, bR.dy)
+          ..lineTo(bM.dx, bM.dy)
+          ..lineTo(bL.dx, bL.dy)
+          ..lineTo(tL.dx, tL.dy)
+          ..close(),
+        cubePaint,
       );
+      canvas.drawLine(tM, kaabaCenter, cubePaint);
+      canvas.drawLine(bL, kaabaCenter, cubePaint);
+      canvas.drawLine(bR, kaabaCenter, cubePaint);
     }
   }
 
@@ -694,4 +773,64 @@ class _DiamondNeedlePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_DiamondNeedlePainter oldDelegate) => oldDelegate.color != color;
+}
+
+class _CubeIcon extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const _CubeIcon({required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(size, size),
+      painter: _CubeIconPainter(color: color),
+    );
+  }
+}
+
+class _CubeIconPainter extends CustomPainter {
+  final Color color;
+  const _CubeIconPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final s = size.width * 0.42;
+    final h = s * 0.88;
+
+    final tM = Offset(cx, cy - h);
+    final tL = Offset(cx - s, cy - h * 0.28);
+    final tR = Offset(cx + s, cy - h * 0.28);
+    final bL = Offset(cx - s, cy + h * 0.28);
+    final bR = Offset(cx + s, cy + h * 0.28);
+    final bM = Offset(cx, cy + h);
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.09
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(tM.dx, tM.dy)
+        ..lineTo(tR.dx, tR.dy)
+        ..lineTo(bR.dx, bR.dy)
+        ..lineTo(bM.dx, bM.dy)
+        ..lineTo(bL.dx, bL.dy)
+        ..lineTo(tL.dx, tL.dy)
+        ..close(),
+      paint,
+    );
+    canvas.drawLine(tM, Offset(cx, cy), paint);
+    canvas.drawLine(bL, Offset(cx, cy), paint);
+    canvas.drawLine(bR, Offset(cx, cy), paint);
+  }
+
+  @override
+  bool shouldRepaint(_CubeIconPainter old) => old.color != color;
 }
