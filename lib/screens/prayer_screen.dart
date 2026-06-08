@@ -34,9 +34,9 @@ const List<_PrayerEntry> _prayerEntries = [
   _PrayerEntry(key: 'fajr',    name: 'Fajr',    icon: Icons.nightlight_outlined),
   _PrayerEntry(key: 'sunrise', name: 'Sunrise', icon: Icons.wb_sunny_outlined,           noAlert: true),
   _PrayerEntry(key: 'dhuhr',   name: 'Dhuhr',   icon: Icons.wb_sunny_outlined),
-  _PrayerEntry(key: 'asr',     name: 'Asr',     icon: Icons.cloud_outlined),
+  _PrayerEntry(key: 'asr',     name: 'Asr',     icon: Icons.wb_cloudy_outlined),
   _PrayerEntry(key: 'maghrib', name: 'Maghrib', icon: Icons.wb_twilight_outlined),
-  _PrayerEntry(key: 'isha',    name: 'Isha',    icon: Icons.nightlight_round_outlined),
+  _PrayerEntry(key: 'isha',    name: 'Isha',    icon: Icons.nightlight_outlined),
 ];
 
 const List<Map<String, dynamic>> _bellOptions = [
