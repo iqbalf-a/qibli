@@ -322,6 +322,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           Divider(height: 1, color: appTheme.line, indent: 16, endIndent: 16),
           _SettingRow(
+            icon: Icons.alarm_outlined,
+            label: 'Prayer Notifications',
+            appTheme: appTheme,
+            trailingWidget: Switch(
+              value: settings.notificationsEnabled,
+              onChanged: settings.updateNotificationsEnabled,
+              trackColor: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? appTheme.accent.withValues(alpha: 0.4)
+                    : appTheme.bg3,
+              ),
+              thumbColor: WidgetStateProperty.all(Colors.white),
+            ),
+          ),
+          Divider(height: 1, color: appTheme.line, indent: 16, endIndent: 16),
+          _SettingRow(
             icon: Icons.calendar_today_outlined,
             label: 'Hijri Adjustment',
             appTheme: appTheme,

@@ -69,6 +69,7 @@ class SettingsProvider extends ChangeNotifier {
   };
   int _hijriOffset = 0;
   ManualLocation? _manualLocation;
+  bool _notificationsEnabled = true;
 
   String get calculationMethod => _calculationMethod;
   String get madhab => _madhab;
@@ -76,6 +77,7 @@ class SettingsProvider extends ChangeNotifier {
   Map<String, String> get bellState => Map.unmodifiable(_bellState);
   int get hijriOffset => _hijriOffset;
   ManualLocation? get manualLocation => _manualLocation;
+  bool get notificationsEnabled => _notificationsEnabled;
 
   SettingsProvider() {
     _load();
@@ -96,6 +98,9 @@ class SettingsProvider extends ChangeNotifier {
       if (saved['hijriOffset'] != null) _hijriOffset = saved['hijriOffset'] as int;
       if (saved['manualLocation'] != null) {
         _manualLocation = ManualLocation.fromJson(saved['manualLocation'] as Map<String, dynamic>);
+      }
+      if (saved['notificationsEnabled'] != null) {
+        _notificationsEnabled = saved['notificationsEnabled'] as bool;
       }
       notifyListeners();
     } catch (_) {}
@@ -144,5 +149,11 @@ class SettingsProvider extends ChangeNotifier {
     _manualLocation = loc;
     notifyListeners();
     _persist({'manualLocation': loc?.toJson()});
+  }
+
+  void updateNotificationsEnabled(bool enabled) {
+    _notificationsEnabled = enabled;
+    notifyListeners();
+    _persist({'notificationsEnabled': enabled});
   }
 }
