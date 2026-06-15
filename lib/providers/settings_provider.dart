@@ -2,6 +2,23 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Notification mode for each prayer.
+enum BellMode {
+  off,
+  notif,
+  adhan;
+
+  /// Serialise to the string stored in SharedPreferences.
+  String toJson() => name;
+
+  /// Deserialise from a stored string, defaulting to [notif].
+  static BellMode fromJson(String? value) => switch (value) {
+        'off' => BellMode.off,
+        'adhan' => BellMode.adhan,
+        _ => BellMode.notif,
+      };
+}
+
 const List<Map<String, String>> calculationMethods = [
   {'key': 'MuslimWorldLeague', 'label': 'Muslim World League'},
   {'key': 'Egyptian', 'label': 'Egyptian'},
@@ -60,12 +77,12 @@ class SettingsProvider extends ChangeNotifier {
   String _calculationMethod = 'MuslimWorldLeague';
   String _madhab = 'Standard';
   String _adhanSound = 'madinah';
-  Map<String, String> _bellState = {
-    'fajr': 'notif',
-    'dhuhr': 'notif',
-    'asr': 'notif',
-    'maghrib': 'notif',
-    'isha': 'notif',
+  Map<String, BellMode> _bellState = {
+    'fajr': BellMode.notif,
+    'dhuhr': BellMode.notif,
+    'asr': BellMode.notif,
+    'maghrib': BellMode.notif,
+    'isha': BellMode.notif,
   };
   int _hijriOffset = 0;
   ManualLocation? _manualLocation;
@@ -74,7 +91,7 @@ class SettingsProvider extends ChangeNotifier {
   String get calculationMethod => _calculationMethod;
   String get madhab => _madhab;
   String get adhanSound => _adhanSound;
-  Map<String, String> get bellState => Map.unmodifiable(_bellState);
+  Map<String, BellMode> get bellState => Map.unmodifiable(_bellState);
   int get hijriOffset => _hijriOffset;
   ManualLocation? get manualLocation => _manualLocation;
   bool get notificationsEnabled => _notificationsEnabled;
@@ -93,7 +110,10 @@ class SettingsProvider extends ChangeNotifier {
       if (saved['madhab'] != null) _madhab = saved['madhab'] as String;
       if (saved['adhanSound'] != null) _adhanSound = saved['adhanSound'] as String;
       if (saved['bellState'] != null) {
-        _bellState = Map<String, String>.from(saved['bellState'] as Map);
+        final rawBell = Map<String, dynamic>.from(saved['bellState'] as Map);
+        _bellState = rawBell.map(
+          (key, value) => MapEntry(key, BellMode.fromJson(value as String?)),
+        );
       }
       if (saved['hijriOffset'] != null) _hijriOffset = saved['hijriOffset'] as int;
       if (saved['manualLocation'] != null) {
@@ -132,10 +152,12 @@ class SettingsProvider extends ChangeNotifier {
     _persist({'adhanSound': key});
   }
 
-  void updateBell(String prayerKey, String value) {
+  void updateBell(String prayerKey, BellMode value) {
     _bellState = {..._bellState, prayerKey: value};
     notifyListeners();
-    _persist({'bellState': _bellState});
+    _persist({
+      'bellState': _bellState.map((k, v) => MapEntry(k, v.toJson())),
+    });
   }
 
   void updateHijriOffset(int value) {

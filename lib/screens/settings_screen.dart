@@ -7,6 +7,7 @@ import '../constants/theme.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/animated_sheet.dart';
+import '../widgets/app_widgets.dart';
 import '../widgets/location_picker.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -179,14 +180,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildLocationCard(AppTheme appTheme, SettingsProvider settings) {
     final hasManual = settings.manualLocation != null;
-    return Container(
+    return ThemedCard(
+      appTheme: appTheme,
+      borderRadius: 16,
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: appTheme.bg1,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: appTheme.line),
-      ),
       child: Row(
         children: [
           Container(
@@ -226,41 +224,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              GestureDetector(
+              BorderIconButton(
+                appTheme: appTheme,
+                label: 'CHANGE',
                 onTap: () => setState(() => _showLocationPicker = true),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: appTheme.accent),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'CHANGE',
-                    style: GoogleFonts.inter(
-                      fontSize: 10, fontWeight: FontWeight.w500,
-                      color: appTheme.accent, letterSpacing: 1,
-                    ),
-                  ),
-                ),
               ),
               if (hasManual) ...[
                 const SizedBox(height: 6),
-                GestureDetector(
+                BorderIconButton(
+                  appTheme: appTheme,
+                  label: 'USE GPS',
                   onTap: () => context.read<SettingsProvider>().updateManualLocation(null),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: appTheme.accent),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'USE GPS',
-                      style: GoogleFonts.inter(
-                        fontSize: 10, fontWeight: FontWeight.w500,
-                        color: appTheme.accent, letterSpacing: 1,
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ],
@@ -279,13 +253,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     String madhabLabel,
     String adhanLabel,
   ) {
-    return Container(
+    return ThemedCard(
+      appTheme: appTheme,
+      borderRadius: 16,
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: appTheme.bg1,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: appTheme.line),
-      ),
       child: Column(
         children: [
           GestureDetector(
@@ -351,13 +322,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ─── Theme card ───────────────────────────────────────────────────────────
 
   Widget _buildThemeCard(AppTheme appTheme, ThemeProvider themeProvider) {
-    return Container(
+    return ThemedCard(
+      appTheme: appTheme,
+      borderRadius: 16,
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: appTheme.bg1,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: appTheme.line),
-      ),
       child: Column(
         children: [
           _ThemeSection(
@@ -384,13 +352,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ─── About card ───────────────────────────────────────────────────────────
 
   Widget _buildAboutCard(AppTheme appTheme) {
-    return Container(
+    return ThemedCard(
+      appTheme: appTheme,
+      borderRadius: 16,
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: appTheme.bg1,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: appTheme.line),
-      ),
       child: Column(
         children: [
           _SettingRow(

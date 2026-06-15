@@ -2,17 +2,17 @@ import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../constants/theme.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
+import '../services/location_service.dart';
 import '../utils/hijri_utils.dart';
 import '../utils/prayer_utils.dart';
 import '../widgets/animated_sheet.dart';
+import '../widgets/app_widgets.dart';
 
 // ─── Prayer list definition ───────────────────────────────────────────────────
 
@@ -39,10 +39,39 @@ const List<_PrayerEntry> _prayerEntries = [
   _PrayerEntry(key: 'isha',    name: 'Isha',    icon: Icons.nightlight_outlined),
 ];
 
-const List<Map<String, dynamic>> _bellOptions = [
-  {'value': 'off',   'label': 'Off',          'desc': 'No notification',    'icon': Icons.notifications_off_outlined},
-  {'value': 'notif', 'label': 'Notification', 'desc': 'Silent alert only',  'icon': Icons.notifications_outlined},
-  {'value': 'adhan', 'label': 'Adhan',        'desc': 'Alert + adhan sound','icon': Icons.volume_up_outlined},
+// Bell option descriptor — uses BellMode values.
+class _BellOption {
+  final BellMode value;
+  final String label;
+  final String desc;
+  final IconData icon;
+  const _BellOption({
+    required this.value,
+    required this.label,
+    required this.desc,
+    required this.icon,
+  });
+}
+
+const List<_BellOption> _bellOptions = [
+  _BellOption(
+    value: BellMode.off,
+    label: 'Off',
+    desc: 'No notification',
+    icon: Icons.notifications_off_outlined,
+  ),
+  _BellOption(
+    value: BellMode.notif,
+    label: 'Notification',
+    desc: 'Silent alert only',
+    icon: Icons.notifications_outlined,
+  ),
+  _BellOption(
+    value: BellMode.adhan,
+    label: 'Adhan',
+    desc: 'Alert + adhan sound',
+    icon: Icons.volume_up_outlined,
+  ),
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -154,52 +183,23 @@ class _PrayerScreenState extends State<PrayerScreen> {
       return;
     }
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      if (mounted) setState(() { _cityName = 'Set location in Settings'; _isRefreshing = false; });
+    final result = await LocationService.fetchLocation();
+    if (!mounted) return;
+    if (result == null) {
+      setState(() {
+        _cityName = 'Set location in Settings';
+        _isRefreshing = false;
+      });
       return;
     }
 
-    try {
-      Position? position = await Geolocator.getLastKnownPosition();
-      position ??= await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.low,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
-      if (!mounted) return;
-      setState(() {
-        _latitude = position!.latitude;
-        _longitude = position.longitude;
-      });
-      try {
-        final placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
-        if (placemarks.isNotEmpty && mounted) {
-          final place = placemarks.first;
-          final area = (place.subAdministrativeArea?.isNotEmpty == true)
-              ? place.subAdministrativeArea!
-              : (place.locality?.isNotEmpty == true)
-                  ? place.locality!
-                  : place.administrativeArea ?? '';
-          final countryCode = place.isoCountryCode ?? place.country ?? '';
-          setState(() => _cityName = '$area, $countryCode');
-        }
-      } catch (_) {
-        if (mounted) {
-          setState(() => _cityName =
-              '${position!.latitude.toStringAsFixed(2)}, ${position.longitude.toStringAsFixed(2)}');
-        }
-      }
-      _rebuildPrayerTimes();
-    } catch (_) {
-      if (mounted) setState(() => _cityName = 'Enable location services');
-    }
-    if (mounted) setState(() => _isRefreshing = false);
+    setState(() {
+      _latitude = result.lat;
+      _longitude = result.lng;
+      _cityName = result.cityName;
+      _isRefreshing = false;
+    });
+    _rebuildPrayerTimes();
   }
 
   void _rebuildPrayerTimes() {
@@ -249,19 +249,6 @@ class _PrayerScreenState extends State<PrayerScreen> {
     if (mounted) setState(() => _isAdhanPlaying = false);
   }
 
-  // ignore: unused_element
-  Future<void> _playAdhan(String soundKey) async {
-    _stopAdhan();
-    final soundEntry = adhanSounds.firstWhere(
-      (entry) => entry['key'] == soundKey,
-      orElse: () => adhanSounds.first,
-    );
-    await _audioPlayer.play(AssetSource(soundEntry['file']!));
-    if (mounted) setState(() => _isAdhanPlaying = true);
-    _adhanStopTimer = Timer(const Duration(minutes: 5), _stopAdhan);
-    _audioPlayer.onPlayerComplete.first.then((_) => _stopAdhan());
-  }
-
   // ─── Next prayer calculation ──────────────────────────────────────────────
 
   ({_PrayerEntry? entry, DateTime? time}) _getNextPrayer() {
@@ -294,10 +281,13 @@ class _PrayerScreenState extends State<PrayerScreen> {
   @override
   Widget build(BuildContext context) {
     final appTheme = context.watch<ThemeProvider>().theme;
-    final settings = context.watch<SettingsProvider>();
+    // Only rebuild when manualLocation changes — other settings are read via
+    // context.read() inside callbacks or _rebuildPrayerTimes().
+    final manualLoc = context.select<SettingsProvider, ManualLocation?>(
+      (s) => s.manualLocation,
+    );
 
-    // Sync manual location changes reactively
-    final manualLoc = settings.manualLocation;
+    // Sync manual location changes reactively.
     if (manualLoc != null &&
         (_latitude != manualLoc.lat || _longitude != manualLoc.lng)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -310,6 +300,16 @@ class _PrayerScreenState extends State<PrayerScreen> {
         _rebuildPrayerTimes();
       });
     }
+
+    // Read bell state and hijriOffset without triggering a full rebuild on
+    // unrelated setting changes.
+    final settings = context.read<SettingsProvider>();
+    final hijriOffset = context.select<SettingsProvider, int>(
+      (s) => s.hijriOffset,
+    );
+    final bellState = context.select<SettingsProvider, Map<String, BellMode>>(
+      (s) => s.bellState,
+    );
 
     final nextPrayer = _getNextPrayer();
     final countdown = nextPrayer.time != null
@@ -327,15 +327,23 @@ class _PrayerScreenState extends State<PrayerScreen> {
             Column(
               children: [
                 _buildHeader(appTheme),
-                _buildHeroCard(appTheme, nextPrayer.entry, nextPrayer.time, countdown, settings.hijriOffset),
-                _buildDateNav(appTheme, settings.hijriOffset),
+                _buildHeroCard(
+                  appTheme,
+                  nextPrayer.entry,
+                  nextPrayer.time,
+                  countdown,
+                  hijriOffset,
+                ),
+                _buildDateNav(appTheme, hijriOffset),
                 if (currentWindowLabel != null) ...[
                   const SizedBox(height: 4),
                   _buildWindowBadge(appTheme, currentWindowLabel),
                   const SizedBox(height: AppSpacing.sm),
                 ],
                 if (_isAdhanPlaying) _buildAdhanBanner(appTheme),
-                Expanded(child: _buildPrayerList(appTheme, settings, nextPrayer.entry)),
+                Expanded(
+                  child: _buildPrayerList(appTheme, bellState, nextPrayer.entry),
+                ),
               ],
             ),
             if (_openBellModalKey != null)
@@ -344,8 +352,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 onDismiss: () => setState(() => _openBellModalKey = null),
                 builder: (close) => _BellModal(
                   prayerKey: _openBellModalKey!,
-                  prayerName: _prayerEntries.firstWhere((e) => e.key == _openBellModalKey).name,
-                  currentValue: settings.bellState[_openBellModalKey!] ?? 'notif',
+                  prayerName: _prayerEntries
+                      .firstWhere((e) => e.key == _openBellModalKey)
+                      .name,
+                  currentValue: bellState[_openBellModalKey!] ?? BellMode.notif,
                   appTheme: appTheme,
                   onSelect: (value) {
                     settings.updateBell(_openBellModalKey!, value);
@@ -550,22 +560,13 @@ class _PrayerScreenState extends State<PrayerScreen> {
               ),
               if (!_isViewingToday) ...[
                 const SizedBox(height: 4),
-                GestureDetector(
+                BorderIconButton(
+                  appTheme: appTheme,
+                  label: 'Back to Today',
                   onTap: _goToToday,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: appTheme.accent),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'Back to Today',
-                      style: GoogleFonts.inter(
-                        fontSize: 11, fontWeight: FontWeight.w500,
-                        color: appTheme.accent, letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
+                  fontSize: 11,
+                  letterSpacing: 0.5,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 ),
               ],
             ],
@@ -638,7 +639,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
   Widget _buildPrayerList(
     AppTheme appTheme,
-    SettingsProvider settings,
+    Map<String, BellMode> bellState,
     _PrayerEntry? nextEntry,
   ) {
     return ListView.builder(
@@ -649,14 +650,15 @@ class _PrayerScreenState extends State<PrayerScreen> {
         final prayerTime = getPrayerTime(_selectedDayPrayerData, prayerEntry.key);
         final isPassed = _isViewingToday && prayerTime != null && prayerTime.isBefore(_now);
         final isNext = _isViewingToday && nextEntry?.key == prayerEntry.key;
-        final currentBell = settings.bellState[prayerEntry.key] ?? (prayerEntry.noAlert ? 'off' : 'notif');
+        final currentBell = bellState[prayerEntry.key] ??
+            (prayerEntry.noAlert ? BellMode.off : BellMode.notif);
 
         final IconData bellIcon;
         final Color bellColor;
-        if (currentBell == 'adhan') {
+        if (currentBell == BellMode.adhan) {
           bellIcon = Icons.volume_up_outlined;
           bellColor = appTheme.accent;
-        } else if (currentBell == 'off') {
+        } else if (currentBell == BellMode.off) {
           bellIcon = Icons.notifications_off_outlined;
           bellColor = isNext ? appTheme.textMute : appTheme.lineStrong;
         } else {
@@ -755,9 +757,9 @@ class _PrayerScreenState extends State<PrayerScreen> {
 class _BellModal extends StatelessWidget {
   final String prayerKey;
   final String prayerName;
-  final String currentValue;
+  final BellMode currentValue;
   final AppTheme appTheme;
-  final void Function(String value) onSelect;
+  final void Function(BellMode value) onSelect;
   final VoidCallback onDismiss;
 
   const _BellModal({
@@ -781,7 +783,11 @@ class _BellModal extends StatelessWidget {
         border: Border(top: BorderSide(color: appTheme.line)),
       ),
       padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 32),
+        AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.lg,
+        32,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -799,13 +805,15 @@ class _BellModal extends StatelessWidget {
             ),
           ),
           ..._bellOptions.map((option) {
-            final isActive = currentValue == option['value'];
+            final isActive = currentValue == option.value;
             return GestureDetector(
-              onTap: () => onSelect(option['value'] as String),
+              onTap: () => onSelect(option.value),
               child: Container(
                 margin: const EdgeInsets.only(bottom: 4),
                 padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md, vertical: 12),
+                  horizontal: AppSpacing.md,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: isActive ? appTheme.bg3 : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
@@ -813,7 +821,7 @@ class _BellModal extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(
-                      option['icon'] as IconData,
+                      option.icon,
                       size: 20,
                       color: isActive ? appTheme.accent : appTheme.textDim,
                     ),
@@ -823,7 +831,7 @@ class _BellModal extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            option['label'] as String,
+                            option.label,
                             style: GoogleFonts.inter(
                               fontSize: 15,
                               fontWeight: FontWeight.w500,
@@ -831,7 +839,7 @@ class _BellModal extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            option['desc'] as String,
+                            option.desc,
                             style: GoogleFonts.inter(
                               fontSize: 12,
                               color: appTheme.textMute,
@@ -841,7 +849,11 @@ class _BellModal extends StatelessWidget {
                       ),
                     ),
                     if (isActive)
-                      Icon(Icons.check, size: 16, color: appTheme.accent),
+                      Icon(
+                        Icons.check,
+                        size: 16,
+                        color: appTheme.accent,
+                      ),
                   ],
                 ),
               ),

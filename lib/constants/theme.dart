@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   final String key;
@@ -32,6 +33,37 @@ class AppTheme {
   final Color toggleThumbBg;
   final Color rowIconBg;
   final bool isDark;
+
+  // ─── Text style helpers ────────────────────────────────────────────────────
+
+  /// 11px / w500 / letterSpacing 1 — used for labels, section headers, badges.
+  TextStyle labelSmall(Color color) => GoogleFonts.inter(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        color: color,
+        letterSpacing: 1,
+      );
+
+  /// 12px / normal weight — used for secondary body content.
+  TextStyle bodySmall(Color color) => GoogleFonts.inter(
+        fontSize: 12,
+        color: color,
+      );
+
+  /// 14px / normal weight — used for list item primary text.
+  TextStyle bodyMedium(Color color) => GoogleFonts.inter(
+        fontSize: 14,
+        color: color,
+      );
+
+  /// 16px / w600 — used for card/section titles.
+  TextStyle titleMedium(Color color) => GoogleFonts.inter(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: color,
+      );
+
+  // ─── Constructor ───────────────────────────────────────────────────────────
 
   const AppTheme({
     required this.key,

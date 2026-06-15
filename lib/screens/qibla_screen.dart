@@ -4,8 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_compass/flutter_compass.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -13,6 +11,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 import '../constants/theme.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
+import '../services/location_service.dart';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -61,6 +60,10 @@ class _QiblaScreenState extends State<QiblaScreen>
   double? _longitude;
   String _cityName = 'Locating...';
 
+  // Cached calculations — recomputed only when coordinates change.
+  double? _qiblaBearing;
+  double? _distanceKm;
+
   // Gyroscope-smoothed dial rotation (accumulated)
   double _dialRotationDegrees = 0;
   double _lerpAngleDegrees = 0;
@@ -77,6 +80,16 @@ class _QiblaScreenState extends State<QiblaScreen>
   DateTime? _lastTickTime;
 
   bool _manualLocationMounted = false;
+
+  void _updateCachedCalculations() {
+    if (_latitude != null && _longitude != null) {
+      _qiblaBearing = _getQiblaBearing(_latitude!, _longitude!);
+      _distanceKm = _getDistanceToMakkahKm(_latitude!, _longitude!);
+    } else {
+      _qiblaBearing = null;
+      _distanceKm = null;
+    }
+  }
 
   // Aligned glow animation
   late final AnimationController _glowCtrl;
@@ -98,10 +111,9 @@ class _QiblaScreenState extends State<QiblaScreen>
       if (rounded != _displayedHeadingDegrees && mounted) {
         setState(() => _displayedHeadingDegrees = rounded);
       }
-      // Update glow when alignment state changes
-      if (_latitude != null && _longitude != null) {
-        final qibla = _getQiblaBearing(_latitude!, _longitude!);
-        final diff = ((qibla - _lerpAngleDegrees + 540) % 360) - 180;
+      // Update glow when alignment state changes — use cached bearing.
+      if (_qiblaBearing != null) {
+        final diff = ((_qiblaBearing! - _lerpAngleDegrees + 540) % 360) - 180;
         final nowAligned = diff.abs() <= _alignmentThresholdDegrees;
         if (nowAligned != _prevIsAligned) {
           _prevIsAligned = nowAligned;
@@ -190,52 +202,36 @@ class _QiblaScreenState extends State<QiblaScreen>
           _latitude = loc.lat;
           _longitude = loc.lng;
           _cityName = '${loc.city}, ${loc.country}';
+          _updateCachedCalculations();
         });
       }
       return;
     }
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      if (mounted) setState(() => _cityName = 'Set location in Settings');
+    final result = await LocationService.fetchLocation();
+    if (!mounted) return;
+    if (result == null) {
+      setState(() => _cityName = 'Set location in Settings');
       return;
     }
 
-    try {
-      final position = await Geolocator.getCurrentPosition();
-      if (!mounted) return;
-      setState(() {
-        _latitude = position.latitude;
-        _longitude = position.longitude;
-      });
-      try {
-        final placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
-        if (placemarks.isNotEmpty && mounted) {
-          final place = placemarks.first;
-          final area = (place.subAdministrativeArea?.isNotEmpty == true)
-              ? place.subAdministrativeArea!
-              : (place.locality?.isNotEmpty == true)
-                  ? place.locality!
-                  : place.administrativeArea ?? '';
-          setState(() => _cityName = '$area, ${place.isoCountryCode ?? ''}');
-        }
-      } catch (_) {}
-    } catch (_) {
-      if (mounted) setState(() => _cityName = 'Enable location services');
-    }
+    setState(() {
+      _latitude = result.lat;
+      _longitude = result.lng;
+      _cityName = result.cityName;
+      _updateCachedCalculations();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final appTheme = context.watch<ThemeProvider>().theme;
-    final settings = context.watch<SettingsProvider>();
+    // Only rebuild when manualLocation changes (Task 2).
+    final manualLoc = context.select<SettingsProvider, ManualLocation?>(
+      (s) => s.manualLocation,
+    );
 
-    // Sync manual location changes
-    final manualLoc = settings.manualLocation;
+    // Sync manual location changes.
     if (!_manualLocationMounted) {
       _manualLocationMounted = true;
     } else if (manualLoc != null &&
@@ -246,16 +242,14 @@ class _QiblaScreenState extends State<QiblaScreen>
           _latitude = manualLoc.lat;
           _longitude = manualLoc.lng;
           _cityName = '${manualLoc.city}, ${manualLoc.country}';
+          _updateCachedCalculations();
         });
       });
     }
 
-    final double? qiblaBearing = (_latitude != null && _longitude != null)
-        ? _getQiblaBearing(_latitude!, _longitude!)
-        : null;
-    final double? distanceKm = (_latitude != null && _longitude != null)
-        ? _getDistanceToMakkahKm(_latitude!, _longitude!)
-        : null;
+    // Use cached bearing/distance (Task 3).
+    final double? qiblaBearing = _qiblaBearing;
+    final double? distanceKm = _distanceKm;
 
     final double? bearingDiff = qiblaBearing != null
         ? ((qiblaBearing - _lerpAngleDegrees + 540) % 360) - 180

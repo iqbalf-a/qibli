@@ -162,23 +162,20 @@ const List<NotableDay> islamicNotableDays = [
   NotableDay(hijriMonth: 12, hijriDay: 13, name: 'Ayyam al-Tasyrik',  desc: 'Fasting prohibited'),
 ];
 
-HolidayInfo? getHoliday(int hijriMonth, int hijriDay) {
-  for (final holiday in islamicHolidays) {
-    if (holiday.hijriMonth == hijriMonth && holiday.hijriDay == hijriDay) {
-      return holiday;
-    }
-  }
-  return null;
-}
+// O(1) lookup maps built once at startup.
+final Map<(int, int), HolidayInfo> _holidayMap = Map.fromEntries(
+  islamicHolidays.map((h) => MapEntry((h.hijriMonth, h.hijriDay), h)),
+);
 
-NotableDay? getNotableDay(int hijriMonth, int hijriDay) {
-  for (final notable in islamicNotableDays) {
-    if (notable.hijriMonth == hijriMonth && notable.hijriDay == hijriDay) {
-      return notable;
-    }
-  }
-  return null;
-}
+final Map<(int, int), NotableDay> _notableDayMap = Map.fromEntries(
+  islamicNotableDays.map((n) => MapEntry((n.hijriMonth, n.hijriDay), n)),
+);
+
+HolidayInfo? getHoliday(int hijriMonth, int hijriDay) =>
+    _holidayMap[(hijriMonth, hijriDay)];
+
+NotableDay? getNotableDay(int hijriMonth, int hijriDay) =>
+    _notableDayMap[(hijriMonth, hijriDay)];
 
 // ─── Calendar grid builders ───────────────────────────────────────────────────
 
