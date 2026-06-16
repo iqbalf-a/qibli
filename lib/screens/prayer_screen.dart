@@ -9,6 +9,7 @@ import '../constants/theme.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/location_service.dart';
+import '../services/notification_service.dart';
 import '../utils/hijri_utils.dart';
 import '../utils/prayer_utils.dart';
 import '../widgets/animated_sheet.dart';
@@ -120,6 +121,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
   String _cityName = 'Locating...';
   PrayerData? _selectedDayPrayerData;
   PrayerData? _todayPrayerData;
+  PrayerData? _tomorrowPrayerData;
   DateTime _now = DateTime.now();
   late DateTime _selectedDate;
   String? _openBellModalKey;
@@ -149,13 +151,28 @@ class _PrayerScreenState extends State<PrayerScreen> {
     super.initState();
     _selectedDate = _todayMidnight();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _now = DateTime.now());
+      if (!mounted) return;
+      setState(() => _now = DateTime.now());
+      _checkAdhanTrigger();
     });
     _fetchLocation();
+    // Reschedule notifications when settings change (bell, sound, toggle).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<SettingsProvider>().addListener(_onSettingsChanged);
+      }
+    });
+  }
+
+  void _onSettingsChanged() {
+    if (mounted && _todayPrayerData != null) {
+      _scheduleNotifications();
+    }
   }
 
   @override
   void dispose() {
+    context.read<SettingsProvider>().removeListener(_onSettingsChanged);
     _clockTimer?.cancel();
     _adhanStopTimer?.cancel();
     _audioPlayer.dispose();
@@ -206,6 +223,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
     if (_latitude == null || _longitude == null || !mounted) return;
     final settings = context.read<SettingsProvider>();
     final today = DateTime.now();
+    final tomorrow = today.add(const Duration(days: 1));
     setState(() {
       _selectedDayPrayerData = buildPrayerTimes(
         latitude: _latitude!,
@@ -221,7 +239,15 @@ class _PrayerScreenState extends State<PrayerScreen> {
         calculationMethod: settings.calculationMethod,
         madhab: settings.madhab,
       );
+      _tomorrowPrayerData = buildPrayerTimes(
+        latitude: _latitude!,
+        longitude: _longitude!,
+        date: tomorrow,
+        calculationMethod: settings.calculationMethod,
+        madhab: settings.madhab,
+      );
     });
+    _scheduleNotifications();
   }
 
   void _goToPreviousDay() {
@@ -247,6 +273,71 @@ class _PrayerScreenState extends State<PrayerScreen> {
     _adhanStopTimer?.cancel();
     _audioPlayer.stop();
     if (mounted) setState(() => _isAdhanPlaying = false);
+  }
+
+  Future<void> _playAdhan(String soundKey) async {
+    if (_isAdhanPlaying) return;
+    final sound = adhanSounds.firstWhere(
+      (s) => s['key'] == soundKey,
+      orElse: () => adhanSounds.first,
+    );
+    setState(() => _isAdhanPlaying = true);
+    await _audioPlayer.play(AssetSource(sound['file']!));
+    _adhanStopTimer = Timer(const Duration(minutes: 5), _stopAdhan);
+  }
+
+  /// Called every second from the clock timer. Triggers in-app adhan playback
+  /// when the current time matches a prayer time (within a 1-second window) and
+  /// the prayer is configured for adhan mode.
+  void _checkAdhanTrigger() {
+    if (_isAdhanPlaying) return;
+    final settings = context.read<SettingsProvider>();
+    if (!settings.notificationsEnabled) return;
+
+    final todayData = _todayPrayerData;
+    if (todayData == null) return;
+
+    const prayerKeys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    for (final key in prayerKeys) {
+      final mode = settings.bellState[key] ?? BellMode.notif;
+      if (mode != BellMode.adhan) continue;
+
+      final prayerTime = getPrayerTime(todayData, key);
+      if (prayerTime == null) continue;
+
+      final diff = _now.difference(prayerTime).inSeconds.abs();
+      if (diff <= 1) {
+        _playAdhan(settings.adhanSound);
+        break;
+      }
+    }
+  }
+
+  // ─── Notification scheduling ──────────────────────────────────────────────
+
+  Future<void> _scheduleNotifications() async {
+    if (_todayPrayerData == null) return;
+    final settings = context.read<SettingsProvider>();
+
+    const prayerKeys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+
+    final Map<String, DateTime?> todayTimes = {};
+    final Map<String, DateTime?> tomorrowTimes = {};
+
+    for (final key in prayerKeys) {
+      todayTimes[key] = getPrayerTime(_todayPrayerData!, key);
+      if (_tomorrowPrayerData != null) {
+        tomorrowTimes[key] = getPrayerTime(_tomorrowPrayerData!, key);
+      }
+    }
+
+    await NotificationService.schedulePrayers(
+      todayTimes: todayTimes,
+      tomorrowTimes: tomorrowTimes,
+      bellState: settings.bellState,
+      notificationsEnabled: settings.notificationsEnabled,
+      adhanSound: settings.adhanSound,
+    );
   }
 
   // ─── Next prayer calculation ──────────────────────────────────────────────
@@ -310,7 +401,6 @@ class _PrayerScreenState extends State<PrayerScreen> {
     final bellState = context.select<SettingsProvider, Map<String, BellMode>>(
       (s) => s.bellState,
     );
-
     final nextPrayer = _getNextPrayer();
     final countdown = nextPrayer.time != null
         ? nextPrayer.time!.difference(_now)

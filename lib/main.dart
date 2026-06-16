@@ -10,10 +10,13 @@ import 'screens/calendar_screen.dart';
 import 'screens/prayer_screen.dart';
 import 'screens/qibla_screen.dart';
 import 'screens/settings_screen.dart';
+import 'services/notification_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  await NotificationService.init();
+  await NotificationService.requestPermission();
   runApp(
     MultiProvider(
       providers: [
