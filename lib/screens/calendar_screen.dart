@@ -452,8 +452,6 @@ class _CalendarScreenState extends State<CalendarScreen>
                             child: Container(
                               width: 36,
                               height: 46,
-                              alignment: Alignment.topCenter,
-                              padding: const EdgeInsets.only(top: 7),
                               decoration: BoxDecoration(
                                 color: isToday
                                     ? appTheme.accentDeep
@@ -466,42 +464,50 @@ class _CalendarScreenState extends State<CalendarScreen>
                                     : null,
                               ),
                               child: Stack(
-                                clipBehavior: Clip.none,
-                                alignment: Alignment.topCenter,
                                 children: [
-                                  Column(
-                                    children: [
-                                      Text(
-                                        '${cell.primaryNumber}',
-                                        style: GoogleFonts.nunito(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700,
-                                          color: primaryColor,
-                                          height: 1.2,
-                                        ),
+                                  Align(
+                                    alignment: Alignment.topCenter,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(top: 7),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '${cell.primaryNumber}',
+                                            style: GoogleFonts.nunito(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                              color: primaryColor,
+                                              height: 1.2,
+                                            ),
+                                          ),
+                                          Text(
+                                            cell.subLabel,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 8,
+                                              color: (isToday || isSelected)
+                                                  ? appTheme.accentSoft.withValues(alpha: 0.7)
+                                                  : appTheme.textMute,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      Text(
-                                        cell.subLabel,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 8,
-                                          color: (isToday || isSelected)
-                                              ? appTheme.accentSoft.withValues(alpha: 0.7)
-                                              : appTheme.textMute,
-                                        ),
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                   if (cell.holiday != null)
-                                    Positioned(
-                                      bottom: -2,
-                                      child: Container(
-                                        width: 4,
-                                        height: 4,
-                                        decoration: BoxDecoration(
-                                          color: (isToday || isSelected)
-                                              ? appTheme.accentSoft
-                                              : appTheme.accent,
-                                          shape: BoxShape.circle,
+                                    Align(
+                                      alignment: Alignment.bottomCenter,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(bottom: 4),
+                                        child: Container(
+                                          width: 4,
+                                          height: 4,
+                                          decoration: BoxDecoration(
+                                            color: (isToday || isSelected)
+                                                ? appTheme.accentSoft
+                                                : appTheme.accent,
+                                            shape: BoxShape.circle,
+                                          ),
                                         ),
                                       ),
                                     ),
