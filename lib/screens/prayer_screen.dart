@@ -127,6 +127,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
   String? _openBellModalKey;
   bool _isRefreshing = false;
   bool _isAdhanPlaying = false;
+  DateTime? _lastAdhanTrigger;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
   Timer? _clockTimer;
@@ -291,6 +292,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
   /// the prayer is configured for adhan mode.
   void _checkAdhanTrigger() {
     if (_isAdhanPlaying) return;
+    final last = _lastAdhanTrigger;
+    if (last != null && DateTime.now().difference(last).inMinutes < 5) return;
     final settings = context.read<SettingsProvider>();
     if (!settings.notificationsEnabled) return;
 
@@ -307,6 +310,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
       final diff = _now.difference(prayerTime).inSeconds.abs();
       if (diff <= 1) {
+        _lastAdhanTrigger = DateTime.now();
         _playAdhan(settings.adhanSound);
         break;
       }

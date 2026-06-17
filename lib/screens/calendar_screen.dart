@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../constants/theme.dart';
+import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 import '../utils/hijri_utils.dart';
 
@@ -26,6 +27,9 @@ class _CalendarScreenState extends State<CalendarScreen>
   late int _hijriMonth;
 
   CalendarCell? _selectedCell;
+
+  // Set at the start of build() via context.select; read by getters below.
+  int _hijriOffset = 0;
 
   // Slide animation
   late AnimationController _slideController;
@@ -129,7 +133,7 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   List<CalendarCell?> get _cells => _mode == 'hijri'
       ? buildHijriGrid(_hijriYear, _hijriMonth)
-      : buildGregorianGrid(_gregorianYear, _gregorianMonth);
+      : buildGregorianGrid(_gregorianYear, _gregorianMonth, hijriOffset: _hijriOffset);
 
   String get _monthTitle => _mode == 'hijri'
       ? '${hijriMonths[_hijriMonth - 1]} $_hijriYear'
@@ -164,7 +168,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       final totalDays = DateTime(_gregorianYear, _gregorianMonth + 1, 0).day;
       for (var day = 1; day <= totalDays; day++) {
         final date = DateTime(_gregorianYear, _gregorianMonth, day);
-        final hijri = gregorianToHijri(date);
+        final hijri = gregorianToHijri(date.add(Duration(days: _hijriOffset)));
         final holiday = getHoliday(hijri.month, hijri.day);
         if (holiday != null) result.add((holiday: holiday, gregorianDate: date));
       }
@@ -205,7 +209,7 @@ class _CalendarScreenState extends State<CalendarScreen>
       final totalDays = DateTime(_gregorianYear, _gregorianMonth + 1, 0).day;
       for (var day = 1; day <= totalDays; day++) {
         final date = DateTime(_gregorianYear, _gregorianMonth, day);
-        final hijri = gregorianToHijri(date);
+        final hijri = gregorianToHijri(date.add(Duration(days: _hijriOffset)));
         final notable = getNotableDay(hijri.month, hijri.day);
         if (notable != null) {
           result.add((notable: notable, gregorianDate: date));
@@ -225,6 +229,7 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   @override
   Widget build(BuildContext context) {
+    _hijriOffset = context.select<SettingsProvider, int>((s) => s.hijriOffset);
     final appTheme = context.watch<ThemeProvider>().theme;
 
     return Scaffold(

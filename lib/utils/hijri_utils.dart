@@ -120,16 +120,11 @@ class HolidayInfo {
 
 const List<HolidayInfo> islamicHolidays = [
   HolidayInfo(hijriMonth: 1,  hijriDay: 1,  name: 'Islamic New Year', desc: 'First day of Muharram'),
-  HolidayInfo(hijriMonth: 1,  hijriDay: 10, name: 'Day of Ashura',    desc: 'Moses freed from Pharaoh'),
   HolidayInfo(hijriMonth: 3,  hijriDay: 12, name: 'Maulid Nabi',      desc: "Birthday of Prophet Muhammad ﷺ"),
   HolidayInfo(hijriMonth: 7,  hijriDay: 27, name: "Isra' Mi'raj",     desc: 'Night journey and ascension'),
-  HolidayInfo(hijriMonth: 9,  hijriDay: 1,  name: 'First of Ramadan', desc: 'Beginning of the fasting month'),
-  HolidayInfo(hijriMonth: 9,  hijriDay: 17, name: 'Nuzul Quran',      desc: 'Revelation of the Quran'),
-  HolidayInfo(hijriMonth: 9,  hijriDay: 27, name: 'Laylatul Qadr',    desc: 'Night of Power'),
   HolidayInfo(hijriMonth: 10, hijriDay: 1,  name: 'Eid al-Fitr',      desc: 'End of Ramadan · day 1'),
   HolidayInfo(hijriMonth: 10, hijriDay: 2,  name: 'Eid al-Fitr',      desc: 'End of Ramadan · day 2'),
   HolidayInfo(hijriMonth: 10, hijriDay: 3,  name: 'Eid al-Fitr',      desc: 'End of Ramadan · day 3'),
-  HolidayInfo(hijriMonth: 12, hijriDay: 9,  name: 'Day of Arafah',    desc: 'Pilgrims gather at Arafah'),
   HolidayInfo(hijriMonth: 12, hijriDay: 10, name: 'Eid al-Adha',      desc: 'Feast of sacrifice'),
 ];
 
@@ -148,7 +143,11 @@ class NotableDay {
 
 const List<NotableDay> islamicNotableDays = [
   NotableDay(hijriMonth: 1,  hijriDay: 9,  name: "Tasu'a",            desc: 'Recommended fast before Ashura'),
+  NotableDay(hijriMonth: 1,  hijriDay: 10, name: 'Day of Ashura',     desc: 'Moses freed from Pharaoh'),
   NotableDay(hijriMonth: 8,  hijriDay: 15, name: "Nisfu Sha'ban",     desc: 'Night of forgiveness'),
+  NotableDay(hijriMonth: 9,  hijriDay: 1,  name: 'First of Ramadan',  desc: 'Beginning of the fasting month'),
+  NotableDay(hijriMonth: 9,  hijriDay: 17, name: 'Nuzul Quran',       desc: 'Revelation of the Quran'),
+  NotableDay(hijriMonth: 9,  hijriDay: 27, name: 'Laylatul Qadr',     desc: 'Night of Power'),
   NotableDay(hijriMonth: 10, hijriDay: 2,  name: '6 Days of Shawwal', desc: 'Recommended fast · day 1 of 6'),
   NotableDay(hijriMonth: 10, hijriDay: 3,  name: '6 Days of Shawwal', desc: 'Recommended fast · day 2 of 6'),
   NotableDay(hijriMonth: 10, hijriDay: 4,  name: '6 Days of Shawwal', desc: 'Recommended fast · day 3 of 6'),
@@ -222,7 +221,7 @@ List<CalendarCell?> buildHijriGrid(int hijriYear, int hijriMonth) {
   return cells;
 }
 
-List<CalendarCell?> buildGregorianGrid(int year, int month) {
+List<CalendarCell?> buildGregorianGrid(int year, int month, {int hijriOffset = 0}) {
   final totalDays = DateTime(year, month + 1, 0).day;
   final startDayOfWeek = DateTime(year, month, 1).weekday % 7; // 0=Sunday
   final cells = <CalendarCell?>[];
@@ -231,7 +230,7 @@ List<CalendarCell?> buildGregorianGrid(int year, int month) {
   }
   for (var day = 1; day <= totalDays; day++) {
     final date = DateTime(year, month, day);
-    final hijri = gregorianToHijri(date);
+    final hijri = gregorianToHijri(date.add(Duration(days: hijriOffset)));
     cells.add(CalendarCell(
       primaryNumber: day,
       subLabel: '${hijri.day} ${hijriShort[hijri.month - 1]}',
