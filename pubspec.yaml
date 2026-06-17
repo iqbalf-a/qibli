@@ -18,7 +18,7 @@ dependencies:
   geolocator: ^13.0.2
   geocoding: ^4.0.0
   flutter_compass: ^0.8.0
-  sensors_plus: ^6.1.0
+  sensors_plus: ^7.0.0
 
   # Prayer times calculation (Dart port of adhan-js)
   adhan: ^2.0.0+1
