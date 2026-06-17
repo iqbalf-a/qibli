@@ -356,17 +356,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
         return (entry: prayerEntry, time: prayerTime);
       }
     }
-    if (_latitude != null && _longitude != null) {
-      final settings = context.read<SettingsProvider>();
-      final tomorrow = DateTime.now().add(const Duration(days: 1));
-      final tomorrowData = buildPrayerTimes(
-        latitude: _latitude!,
-        longitude: _longitude!,
-        date: tomorrow,
-        calculationMethod: settings.calculationMethod,
-        madhab: settings.madhab,
-      );
-      return (entry: _prayerEntries[1], time: tomorrowData.fajr);
+    // All today's prayers have passed — show tomorrow's Fajr.
+    final tomorrowFajr = _tomorrowPrayerData?.fajr;
+    if (tomorrowFajr != null) {
+      return (entry: _prayerEntries[1], time: tomorrowFajr);
     }
     return (entry: null, time: null);
   }
@@ -742,8 +735,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
       itemBuilder: (context, index) {
         final prayerEntry = _prayerEntries[index];
         final prayerTime = getPrayerTime(_selectedDayPrayerData, prayerEntry.key);
-        final isPassed = _isViewingToday && prayerTime != null && prayerTime.isBefore(_now);
         final isNext = _isViewingToday && nextEntry?.key == prayerEntry.key;
+        final isPassed = _isViewingToday && prayerTime != null && prayerTime.isBefore(_now);
         final currentBell = bellState[prayerEntry.key] ??
             (prayerEntry.noAlert ? BellMode.off : BellMode.notif);
 
