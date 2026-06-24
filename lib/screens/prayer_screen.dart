@@ -283,7 +283,19 @@ class _PrayerScreenState extends State<PrayerScreen> {
       orElse: () => adhanSounds.first,
     );
     setState(() => _isAdhanPlaying = true);
+    await _audioPlayer.setAudioContext(
+      AudioContext(
+        android: AudioContextAndroid(
+          usageType: AndroidUsageType.alarm,
+          contentType: AndroidContentType.music,
+          audioFocus: AndroidAudioFocus.gainTransient,
+          isSpeakerphoneOn: false,
+          stayAwake: false,
+        ),
+      ),
+    );
     await _audioPlayer.play(AssetSource(sound['file']!));
+    if (!mounted) return;
     _adhanStopTimer = Timer(const Duration(minutes: 5), _stopAdhan);
   }
 
@@ -308,7 +320,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
       final prayerTime = getPrayerTime(todayData, key);
       if (prayerTime == null) continue;
 
-      final diff = _now.difference(prayerTime).inSeconds.abs();
+      final diff = DateTime.now().difference(prayerTime).inSeconds.abs();
       if (diff <= 1) {
         _lastAdhanTrigger = DateTime.now();
         _playAdhan(settings.adhanSound);
@@ -730,7 +742,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
     _PrayerEntry? nextEntry,
   ) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xl),
       itemCount: _prayerEntries.length,
       itemBuilder: (context, index) {
         final prayerEntry = _prayerEntries[index];

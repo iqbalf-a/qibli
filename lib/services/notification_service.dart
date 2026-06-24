@@ -77,6 +77,12 @@ class NotificationService {
         ?.createNotificationChannel(adhanChannel);
   }
 
+  static Future<bool> _canScheduleExactAlarms() async {
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    return await android?.canScheduleExactNotifications() ?? false;
+  }
+
   /// Schedule all prayer notifications for today and tomorrow.
   static Future<void> schedulePrayers({
     required Map<String, DateTime?> todayTimes,
@@ -91,6 +97,13 @@ class NotificationService {
 
     final rawFile = _adhanRawFiles[adhanSound] ?? 'adhan_madinah';
     await _ensureAdhanChannel(adhanSound);
+
+    // Check once — exact alarms need SCHEDULE_EXACT_ALARM granted by user
+    // in Settings. Fall back to inexact if not granted.
+    final canExact = await _canScheduleExactAlarms();
+    final scheduleMode = canExact
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexact;
 
     final now = DateTime.now();
 
@@ -111,6 +124,7 @@ class NotificationService {
           mode: mode,
           adhanSoundKey: adhanSound,
           adhanRawFile: rawFile,
+          scheduleMode: scheduleMode,
         );
       }
 
@@ -124,6 +138,7 @@ class NotificationService {
           mode: mode,
           adhanSoundKey: adhanSound,
           adhanRawFile: rawFile,
+          scheduleMode: scheduleMode,
         );
       }
     }
@@ -136,6 +151,7 @@ class NotificationService {
     required BellMode mode,
     required String adhanSoundKey,
     required String adhanRawFile,
+    required AndroidScheduleMode scheduleMode,
   }) async {
     final tzTime = tz.TZDateTime.from(scheduledTime, tz.local);
 
@@ -170,7 +186,7 @@ class NotificationService {
       "It's time for $prayerName prayer",
       tzTime,
       notificationDetails,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: scheduleMode,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );

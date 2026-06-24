@@ -28,6 +28,8 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   CalendarCell? _selectedCell;
 
+  final ScrollController _scrollController = ScrollController();
+
   // Set at the start of build() via context.select; read by getters below.
   int _hijriOffset = 0;
 
@@ -56,6 +58,7 @@ class _CalendarScreenState extends State<CalendarScreen>
   @override
   void dispose() {
     _slideController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -125,6 +128,29 @@ class _CalendarScreenState extends State<CalendarScreen>
       _selectedCell = null;
     });
     _animateSlide(currentPosition < todayPosition ? 1 : -1);
+  }
+
+  CalendarCell? _findCell(DateTime date) {
+    for (final cell in _cells) {
+      if (cell != null &&
+          cell.gregorianDate.year == date.year &&
+          cell.gregorianDate.month == date.month &&
+          cell.gregorianDate.day == date.day) {
+        return cell;
+      }
+    }
+    return null;
+  }
+
+  void _selectFromList(DateTime gregorianDate) {
+    final cell = _findCell(gregorianDate);
+    if (cell == null) return;
+    setState(() => _selectedCell = cell);
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
   }
 
   bool get _isOffMonth => _mode == 'hijri'
@@ -245,6 +271,7 @@ class _CalendarScreenState extends State<CalendarScreen>
             }
           },
           child: SingleChildScrollView(
+            controller: _scrollController,
             padding: const EdgeInsets.only(bottom: AppSpacing.xl),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -660,37 +687,50 @@ class _CalendarScreenState extends State<CalendarScreen>
           ..._monthHolidays.map((entry) {
             final holiday = entry.holiday;
             final gregorianDate = entry.gregorianDate;
-            return Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: appTheme.line)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 6, height: 6,
-                    decoration: BoxDecoration(color: appTheme.accent, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(holiday.name,
+            final isSelected = _selectedCell != null &&
+                _selectedCell!.gregorianDate.year == gregorianDate.year &&
+                _selectedCell!.gregorianDate.month == gregorianDate.month &&
+                _selectedCell!.gregorianDate.day == gregorianDate.day;
+            return GestureDetector(
+              onTap: () => _selectFromList(gregorianDate),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                decoration: BoxDecoration(
+                  color: isSelected ? appTheme.bg3 : Colors.transparent,
+                  borderRadius: isSelected ? BorderRadius.circular(8) : null,
+                  border: Border(bottom: BorderSide(color: appTheme.line)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 6, height: 6,
+                      decoration: BoxDecoration(color: appTheme.accent, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            holiday.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: appTheme.text)),
-                        if (holiday.desc.isNotEmpty)
-                          Text(holiday.desc,
-                              style: GoogleFonts.inter(fontSize: 10, color: appTheme.textMute)),
-                      ],
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: appTheme.text),
+                          ),
+                          if (holiday.desc.isNotEmpty)
+                            Text(
+                              holiday.desc,
+                              style: GoogleFonts.inter(fontSize: 10, color: appTheme.textMute),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  Text(
-                    '${holiday.hijriDay} ${hijriMonths[holiday.hijriMonth - 1]}  ·  ${gregShort[gregorianDate.month - 1]} ${gregorianDate.day}',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: appTheme.textMute),
-                  ),
-                ],
+                    Text(
+                      '${holiday.hijriDay} ${hijriMonths[holiday.hijriMonth - 1]}  ·  ${gregShort[gregorianDate.month - 1]} ${gregorianDate.day}',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: appTheme.textMute),
+                    ),
+                  ],
+                ),
               ),
             );
           }),
@@ -723,36 +763,49 @@ class _CalendarScreenState extends State<CalendarScreen>
           ..._monthNotable.map((entry) {
             final notable = entry.notable;
             final gregorianDate = entry.gregorianDate;
-            return Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: appTheme.line)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 6, height: 6,
-                    decoration: BoxDecoration(color: appTheme.accentSoft, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(notable.name,
+            final isSelected = _selectedCell != null &&
+                _selectedCell!.gregorianDate.year == gregorianDate.year &&
+                _selectedCell!.gregorianDate.month == gregorianDate.month &&
+                _selectedCell!.gregorianDate.day == gregorianDate.day;
+            return GestureDetector(
+              onTap: () => _selectFromList(gregorianDate),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                decoration: BoxDecoration(
+                  color: isSelected ? appTheme.bg3 : Colors.transparent,
+                  borderRadius: isSelected ? BorderRadius.circular(8) : null,
+                  border: Border(bottom: BorderSide(color: appTheme.line)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 6, height: 6,
+                      decoration: BoxDecoration(color: appTheme.accentSoft, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            notable.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: appTheme.text)),
-                        Text(notable.desc,
-                            style: GoogleFonts.inter(fontSize: 10, color: appTheme.textMute)),
-                      ],
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: appTheme.text),
+                          ),
+                          Text(
+                            notable.desc,
+                            style: GoogleFonts.inter(fontSize: 10, color: appTheme.textMute),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  Text(
-                    '${notable.hijriDay} ${hijriMonths[notable.hijriMonth - 1]}  ·  ${gregShort[gregorianDate.month - 1]} ${gregorianDate.day}',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: appTheme.textMute),
-                  ),
-                ],
+                    Text(
+                      '${notable.hijriDay} ${hijriMonths[notable.hijriMonth - 1]}  ·  ${gregShort[gregorianDate.month - 1]} ${gregorianDate.day}',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: appTheme.textMute),
+                    ),
+                  ],
+                ),
               ),
             );
           }),

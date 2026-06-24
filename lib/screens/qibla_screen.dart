@@ -139,13 +139,14 @@ class _QiblaScreenState extends State<QiblaScreen>
   }
 
   void _startSensors() {
-    // Magnetometer compass heading
+    _compassSubscription?.cancel();
+    _gyroscopeSubscription?.cancel();
+
     _compassSubscription = FlutterCompass.events?.listen((compassEvent) {
       final heading = compassEvent.heading ?? compassEvent.headingForCameraMode;
       if (heading != null) _headingTarget = heading;
     });
 
-    // Gyroscope for smooth 60fps interpolation
     _gyroscopeSubscription = gyroscopeEventStream().listen((gyroscopeEvent) {
       _rawGyroZ = gyroscopeEvent.z;
     });
