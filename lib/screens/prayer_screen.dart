@@ -9,7 +9,6 @@ import '../constants/theme.dart';
 import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/location_service.dart';
-import '../services/background_service.dart';
 import '../services/notification_service.dart';
 import '../utils/hijri_utils.dart';
 import '../utils/prayer_utils.dart';
@@ -223,7 +222,6 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
   void _rebuildPrayerTimes() {
     if (_latitude == null || _longitude == null || !mounted) return;
-    cacheCoordinates(_latitude!, _longitude!);
     final settings = context.read<SettingsProvider>();
     final today = DateTime.now();
     final tomorrow = today.add(const Duration(days: 1));
@@ -338,7 +336,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
     final settings = context.read<SettingsProvider>();
 
     const prayerKeys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
-    const scheduleDays = 7;
+    const scheduleDays = 30;
     final today = DateTime.now();
 
     final dayTimesList = <Map<String, DateTime?>>[];

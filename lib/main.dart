@@ -10,7 +10,6 @@ import 'screens/calendar_screen.dart';
 import 'screens/prayer_screen.dart';
 import 'screens/qibla_screen.dart';
 import 'screens/settings_screen.dart';
-import 'services/background_service.dart';
 import 'services/notification_service.dart';
 
 void main() async {
@@ -18,7 +17,6 @@ void main() async {
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   await NotificationService.init();
   await NotificationService.requestPermission();
-  await registerRescheduleTask();
   runApp(
     MultiProvider(
       providers: [
