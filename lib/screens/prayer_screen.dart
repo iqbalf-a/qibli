@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -253,19 +254,35 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
   void _goToPreviousDay() {
     if (_dayOffset <= -7) return;
-    setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1)));
-    _rebuildPrayerTimes();
+    _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+    _rebuildSelectedDay();
   }
 
   void _goToNextDay() {
     if (_dayOffset >= 7) return;
-    setState(() => _selectedDate = _selectedDate.add(const Duration(days: 1)));
-    _rebuildPrayerTimes();
+    _selectedDate = _selectedDate.add(const Duration(days: 1));
+    _rebuildSelectedDay();
   }
 
   void _goToToday() {
-    setState(() => _selectedDate = _todayMidnight());
-    _rebuildPrayerTimes();
+    _selectedDate = _todayMidnight();
+    _rebuildSelectedDay();
+  }
+
+  void _rebuildSelectedDay() {
+    if (_latitude == null || _longitude == null) {
+      setState(() {});
+      return;
+    }
+    final settings = context.read<SettingsProvider>();
+    final data = buildPrayerTimes(
+      latitude: _latitude!,
+      longitude: _longitude!,
+      date: _selectedDate,
+      calculationMethod: settings.calculationMethod,
+      madhab: settings.madhab,
+    );
+    setState(() => _selectedDayPrayerData = data);
   }
 
   // ─── Adhan playback ───────────────────────────────────────────────────────
@@ -336,7 +353,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
     final settings = context.read<SettingsProvider>();
 
     const prayerKeys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
-    const scheduleDays = 30;
+    const scheduleDays = kReleaseMode ? 30 : 3;
     final today = DateTime.now();
 
     final dayTimesList = <Map<String, DateTime?>>[];
