@@ -83,10 +83,10 @@ class NotificationService {
     return await android?.canScheduleExactNotifications() ?? false;
   }
 
-  /// Schedule all prayer notifications for today and tomorrow.
+  /// Schedule prayer notifications for the next N days.
+  /// [dayTimesList] index 0 = today, 1 = tomorrow, etc.
   static Future<void> schedulePrayers({
-    required Map<String, DateTime?> todayTimes,
-    required Map<String, DateTime?> tomorrowTimes,
+    required List<Map<String, DateTime?>> dayTimesList,
     required Map<String, BellMode> bellState,
     required bool notificationsEnabled,
     required String adhanSound,
@@ -98,8 +98,6 @@ class NotificationService {
     final rawFile = _adhanRawFiles[adhanSound] ?? 'adhan_madinah';
     await _ensureAdhanChannel(adhanSound);
 
-    // Check once — exact alarms need SCHEDULE_EXACT_ALARM granted by user
-    // in Settings. Fall back to inexact if not granted.
     final canExact = await _canScheduleExactAlarms();
     final scheduleMode = canExact
         ? AndroidScheduleMode.exactAllowWhileIdle
@@ -107,34 +105,22 @@ class NotificationService {
 
     final now = DateTime.now();
 
-    for (final key in _prayerIds.keys) {
-      final mode = bellState[key] ?? BellMode.notif;
-      if (mode == BellMode.off) continue;
+    for (var dayOffset = 0; dayOffset < dayTimesList.length; dayOffset++) {
+      final dayTimes = dayTimesList[dayOffset];
 
-      final baseId = _prayerIds[key]!;
-      final name = _prayerNames[key]!;
+      for (final key in _prayerIds.keys) {
+        final mode = bellState[key] ?? BellMode.notif;
+        if (mode == BellMode.off) continue;
 
-      // Today — only if still in the future.
-      final todayTime = todayTimes[key];
-      if (todayTime != null && todayTime.isAfter(now)) {
+        final prayerTime = dayTimes[key];
+        if (prayerTime == null) continue;
+        // Skip prayers that have already passed today.
+        if (dayOffset == 0 && !prayerTime.isAfter(now)) continue;
+
         await _scheduleOne(
-          id: baseId,
-          prayerName: name,
-          scheduledTime: todayTime,
-          mode: mode,
-          adhanSoundKey: adhanSound,
-          adhanRawFile: rawFile,
-          scheduleMode: scheduleMode,
-        );
-      }
-
-      // Tomorrow.
-      final tomorrowTime = tomorrowTimes[key];
-      if (tomorrowTime != null) {
-        await _scheduleOne(
-          id: baseId + 10,
-          prayerName: name,
-          scheduledTime: tomorrowTime,
+          id: _prayerIds[key]! + dayOffset * 10,
+          prayerName: _prayerNames[key]!,
+          scheduledTime: prayerTime,
           mode: mode,
           adhanSoundKey: adhanSound,
           adhanRawFile: rawFile,

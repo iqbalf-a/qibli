@@ -332,24 +332,32 @@ class _PrayerScreenState extends State<PrayerScreen> {
   // ─── Notification scheduling ──────────────────────────────────────────────
 
   Future<void> _scheduleNotifications() async {
-    if (_todayPrayerData == null) return;
+    if (_latitude == null || _longitude == null) return;
     final settings = context.read<SettingsProvider>();
 
     const prayerKeys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    const scheduleDays = 7;
+    final today = DateTime.now();
 
-    final Map<String, DateTime?> todayTimes = {};
-    final Map<String, DateTime?> tomorrowTimes = {};
-
-    for (final key in prayerKeys) {
-      todayTimes[key] = getPrayerTime(_todayPrayerData!, key);
-      if (_tomorrowPrayerData != null) {
-        tomorrowTimes[key] = getPrayerTime(_tomorrowPrayerData!, key);
+    final dayTimesList = <Map<String, DateTime?>>[];
+    for (var dayOffset = 0; dayOffset < scheduleDays; dayOffset++) {
+      final date = today.add(Duration(days: dayOffset));
+      final prayerData = buildPrayerTimes(
+        latitude: _latitude!,
+        longitude: _longitude!,
+        date: date,
+        calculationMethod: settings.calculationMethod,
+        madhab: settings.madhab,
+      );
+      final Map<String, DateTime?> dayTimes = {};
+      for (final key in prayerKeys) {
+        dayTimes[key] = getPrayerTime(prayerData, key);
       }
+      dayTimesList.add(dayTimes);
     }
 
     await NotificationService.schedulePrayers(
-      todayTimes: todayTimes,
-      tomorrowTimes: tomorrowTimes,
+      dayTimesList: dayTimesList,
       bellState: settings.bellState,
       notificationsEnabled: settings.notificationsEnabled,
       adhanSound: settings.adhanSound,
